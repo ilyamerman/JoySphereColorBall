@@ -4,7 +4,7 @@
 #include <SoftwareSerial.h>
 #include <string.h>
 
-SoftwareSerial mySerial(3,4);
+SoftwareSerial mySerial(3,5);
 
 // Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
 // is used in I2Cdev.h
@@ -24,6 +24,7 @@ bool blinkState = false;
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
+int changeAngle = 30;
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
 uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
 uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
@@ -36,6 +37,11 @@ VectorFloat gravity;    // [x, y, z]            gravity vector
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
 #define ACCELERO_BUFFER_SIZE 10
+
+int red_light_pin= 9;
+int green_light_pin = 8;
+int blue_light_pin = 7;
+
 float yawBuffer[ACCELERO_BUFFER_SIZE];
 float pitchBuffer[ACCELERO_BUFFER_SIZE];
 float rollBuffer[ACCELERO_BUFFER_SIZE];
@@ -52,54 +58,54 @@ void dmpDataReady() {
     mpuInterrupt = true;
 }
 
-bool isYellow() {
+bool isLeft() {
     double yawValueFromThePast = yawBuffer[bufferIndex % ACCELERO_BUFFER_SIZE];
     double currentYaw = yawBuffer[(bufferIndex - 1) % ACCELERO_BUFFER_SIZE];
 
     if (yawValueFromThePast < 0 && currentYaw > 0) {
-        return abs(yawValueFromThePast - currentYaw) < 345 && abs(yawValueFromThePast - currentYaw) > 300 &&
-               abs(yawValueFromThePast - currentYaw) > 300;
-    } else if (abs(yawValueFromThePast - currentYaw) < 345 && (yawValueFromThePast > 0 && currentYaw < 0)) {
+        return abs(yawValueFromThePast - currentYaw) < (360 - (changeAngle / 2)) && abs(yawValueFromThePast - currentYaw) > (360 - (changeAngle*2)) &&
+               abs(yawValueFromThePast - currentYaw) > (360 - (changeAngle*2));
+    } else if (abs(yawValueFromThePast - currentYaw) < (360 - (changeAngle / 2)) && (yawValueFromThePast > 0 && currentYaw < 0)) {
         return false;
     }
 
-    return (currentYaw < yawValueFromThePast) && (abs(yawValueFromThePast - currentYaw) > 30);
+    return (currentYaw < yawValueFromThePast) && (abs(yawValueFromThePast - currentYaw) > changeAngle);
 }
 
-bool isRed() {
+bool isRight() {
     double yawValueFromThePast = yawBuffer[bufferIndex % ACCELERO_BUFFER_SIZE];
     double currentYaw = yawBuffer[(bufferIndex - 1) % ACCELERO_BUFFER_SIZE];
 
     if (yawValueFromThePast < 0 && currentYaw > 0) {
-        return abs(yawValueFromThePast - currentYaw) < 345 && abs(yawValueFromThePast - currentYaw) > 300;
+        return abs(yawValueFromThePast - currentYaw) < (360 - (changeAngle / 2)) && abs(yawValueFromThePast - currentYaw) > (360 - (changeAngle*2));
     }
 
-    return (currentYaw > yawValueFromThePast) && (abs(yawValueFromThePast - currentYaw) > 30);
+    return (currentYaw > yawValueFromThePast) && (abs(yawValueFromThePast - currentYaw) > changeAngle);
 }
 
-bool isBlue() {
+bool isForward() {
     double pitchValueFromThePast = pitchBuffer[bufferIndex % ACCELERO_BUFFER_SIZE];
     double currentPitch = pitchBuffer[(bufferIndex - 1) % ACCELERO_BUFFER_SIZE];
 
     if (pitchValueFromThePast < 0 && currentPitch > 0) {
-        return abs(pitchValueFromThePast - currentPitch) < 345 && abs(pitchValueFromThePast - currentPitch) > 300;
+        return abs(pitchValueFromThePast - currentPitch) < (360 - (changeAngle / 2)) && abs(pitchValueFromThePast - currentPitch) > (360 - (changeAngle*2));
     }
 
-    return (currentPitch > pitchValueFromThePast) && (abs(pitchValueFromThePast - currentPitch) > 30);
+    return (currentPitch > pitchValueFromThePast) && (abs(pitchValueFromThePast - currentPitch) > changeAngle);
 }
 
-bool isReset() {
+bool isBack() {
     double pitchValueFromThePast = pitchBuffer[bufferIndex % ACCELERO_BUFFER_SIZE];
     double currentPitch = pitchBuffer[(bufferIndex - 1) % ACCELERO_BUFFER_SIZE];
 
     if (pitchValueFromThePast < 0 && currentPitch > 0) {
-        return abs(pitchValueFromThePast - currentPitch) < 345 && abs(pitchValueFromThePast - currentPitch) > 300 &&
-               abs(pitchValueFromThePast - currentPitch) > 300;
-    } else if (abs(pitchValueFromThePast - currentPitch) < 345 && (pitchValueFromThePast > 0 && currentPitch < 0)) {
+        return abs(pitchValueFromThePast - currentPitch) < (360 - (changeAngle / 2)) && abs(pitchValueFromThePast - currentPitch) > (360 - (changeAngle*2)) &&
+               abs(pitchValueFromThePast - currentPitch) > (360 - (changeAngle*2));
+    } else if (abs(pitchValueFromThePast - currentPitch) < (360 - (changeAngle / 2)) && (pitchValueFromThePast > 0 && currentPitch < 0)) {
         return false;
     }
 
-    return (currentPitch < pitchValueFromThePast) && (abs(pitchValueFromThePast - currentPitch) > 30);
+    return (currentPitch < pitchValueFromThePast) && (abs(pitchValueFromThePast - currentPitch) > changeAngle);
 }
 
 void printDebug() {
@@ -116,8 +122,15 @@ void printDebug() {
     Serial.println(roll);
 }
 
+void RGB_color(int red_light_value, int green_light_value, int blue_light_value)
+{
+    analogWrite(red_light_pin, red_light_value);
+    analogWrite(green_light_pin, green_light_value);
+    analogWrite(blue_light_pin, blue_light_value);
+}
+
 void setup() {
-    mySerial.begin(9600);
+    mySerial.begin(38400);
 
     // join I2C bus (I2Cdev library doesn't do this automatically)
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
@@ -140,6 +153,7 @@ void setup() {
     // crystal solution for the UART timer.
 
     // initialize device
+    Serial.println(F("Ilya was here"));
     Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
     pinMode(INTERRUPT_PIN, INPUT);
@@ -176,6 +190,7 @@ void setup() {
 
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
         Serial.println(F("DMP ready! Waiting for first interrupt..."));
+        Serial.println(F("Ilya edited this!"));
         dmpReady = true;
 
         // get expected DMP packet size for later comparison
@@ -192,8 +207,15 @@ void setup() {
 
     // configure LED for output
     pinMode(LED_PIN, OUTPUT);
+    pinMode(red_light_pin, OUTPUT);
+    pinMode(green_light_pin, OUTPUT);
+    pinMode(blue_light_pin, OUTPUT);
+
+    // Sending a code to the game so we will request the changeAngle
+    mySerial.println("9");
 }
 
+String str;
 void loop() {
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
@@ -254,33 +276,97 @@ void loop() {
 
         int currentTime = now();
 
-        if (isYellow()) {
+        if (isLeft()) {
             if (lastColorTime != currentTime) {
                 lastColorTime = currentTime;
 
                 mySerial.println("1");
-                Serial.println("1");
+//                Serial.println("1");
             }
-        } else if (isRed()) {
+        } else if (isRight()) {
             if (lastColorTime != currentTime) {
                 lastColorTime = currentTime;
 
                 mySerial.println("2");
 //                Serial.println("2");
             }
-        } else if (isReset()) {
+        } else if (isBack()) {
             if (lastColorTime != currentTime) {
                 lastColorTime = currentTime;
 
                 mySerial.println("4");
 //                Serial.println("4");
             }
-        } else if (isBlue()) {
+        } else if (isForward()) {
             if (lastColorTime != currentTime) {
                 lastColorTime = currentTime;
 
                 mySerial.println("3");
 //                Serial.println("3");
+            }
+        }
+
+        // Reading value from the
+        if (mySerial.available() > 0) {
+            char value = mySerial.read();
+
+            Serial.print("Value is: ");
+            Serial.println(value);
+            if (value == 13) {
+                Serial.println("Inside if");
+                // finished reading, do stuff
+
+                if (str[0] == 'A') {
+                    // Configurable change angle
+                    str = str.substring(2);
+                    changeAngle = atoi(str.c_str());
+                }
+                else if (str[0] == 'R') {
+                    // Reset
+                    asm volatile ("  jmp 0");
+                }
+                else {
+                    switch (str[0]) {
+                        case '0':
+                            RGB_color(255, 255, 255); // White
+                            Serial.println("doing color white");
+                            break;
+                        case '1':
+                            RGB_color(255, 0, 0); // Red
+                            Serial.println("doing color red");
+                            break;
+                        case '2':
+                            RGB_color(0, 0, 255); // Blue
+                            Serial.println("doing color blue");
+                            break;
+                        case '3':
+                            RGB_color(255, 255, 0); // Yellow
+                            Serial.println("doing color yellow");
+                            break;
+                        case '4':
+                            RGB_color(255, 0, 255); // Magenta
+                            Serial.println("doing color magenta");
+                            break;
+                        case '5':
+                            RGB_color(0, 255, 0); // Green
+                            Serial.println("doing color green");
+                            break;
+                        case '6':
+                            RGB_color(0, 255, 255); // Cyan
+                            break;
+                        case '7':
+                            RGB_color(0, 0, 0); // Black
+                            break;
+                    }
+                }
+
+                str = "";
+            }
+            else if (value == 10) {
+                // nothing
+            }
+            else {
+                str += value;
             }
         }
     }
