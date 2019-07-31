@@ -4,7 +4,7 @@
 #include <SoftwareSerial.h>
 #include <string.h>
 
-SoftwareSerial mySerial(3,5);
+SoftwareSerial mySerial(3,4);
 
 // Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
 // is used in I2Cdev.h
@@ -24,7 +24,7 @@ bool blinkState = false;
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
-int changeAngle = 30;
+int changeAngle = 20;
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
 uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
 uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
@@ -130,7 +130,7 @@ void RGB_color(int red_light_value, int green_light_value, int blue_light_value)
 }
 
 void setup() {
-    mySerial.begin(38400);
+    mySerial.begin(9600);
 
     // join I2C bus (I2Cdev library doesn't do this automatically)
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE

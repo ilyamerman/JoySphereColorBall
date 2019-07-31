@@ -31,7 +31,7 @@ link_directories(/Applications/Arduino.app/Contents/Java/hardware/arduino/avr/li
 
 #### Additional settings for programmer. From programmers.txt
 set(${PROJECT_NAME}_PROGRAMMER avrispmkii)
-set(${PROJECT_NAME}_PORT /dev/cu.usbmodem14101)
+set(${PROJECT_NAME}_PORT /dev/cu.usbserial-A106PXZJ)
 set(uno.upload.speed 115200)
 
 ## Verbose build process
